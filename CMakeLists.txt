@@ -22,6 +22,9 @@ add_library(
 		NameGenerator.cpp
 		Calculator.cpp
         Constchar_to_LPCWSTR.cpp		
+		
+		
+		
 		)
 # 设置输出的dll文件的名字(最后一个参数)，目前是MiraiCP.dll
 set_target_properties(MiraiCP PROPERTIES OUTPUT_NAME MiraiCP)

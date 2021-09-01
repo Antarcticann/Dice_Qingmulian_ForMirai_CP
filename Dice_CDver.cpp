@@ -74,9 +74,9 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 				time_t nowtime;
 				time(&nowtime);
 				vector<unsigned long long>GroupList = Bot(botid).getGroupList();
+				int lmtRefrCut = 0;
 				for (vector<unsigned long long>::iterator GroupListCut = GroupList.begin(); GroupListCut != GroupList.end(); GroupListCut++)
 				{
-					int lmtRefrCut = 0;
 					string strInfo;
 					if (LmtGroupList.count(*GroupListCut))
 					{
@@ -94,11 +94,12 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 					}
 					else
 					{
+						lmtRefrCut++;
 						if (!LMTWhiteList.count(*GroupListCut))
 						{
-							lmtRefrCut++;
+							
 							IdleTimer(*GroupListCut);
-							if (lmtRefrCut <= 10)
+							if (lmtRefrCut <= 8)
 							{
 								Friend(Masterid, botid).sendMsg("发现漏网之鱼:" + to_string(*GroupListCut) + Group(*GroupListCut, botid).nickOrNameCard());
 								Sleep(1000);
@@ -106,11 +107,11 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 							logger->info("发现漏网之鱼:" + to_string(*GroupListCut));
 						}					
 					}
-					if (lmtRefrCut > 0)
-					{
-						Friend(Masterid, botid).sendMsg("发现" + to_string(lmtRefrCut) + "条漏网之鱼,已全部更新");
-					}
-				}				
+				}
+				if (lmtRefrCut > 0)
+				{
+					Friend(Masterid, botid).sendMsg("发现" + to_string(lmtRefrCut) + "条漏网之鱼,已全部更新");
+				}
 				Bot(botid).refreshInfo();
 				//刷新LMT白名单
 				GroupList = Bot(botid).getGroupList();
@@ -440,11 +441,13 @@ public:
         // 邀请事件
         // 好友申请
         procession->registerEvent<NewFriendRequestEvent>([](NewFriendRequestEvent e) {
-			e.accept();			
+			e.accept();
+			Friend(MasterQQId, e.bot.id).sendMsg("收到好友申请，已同意，邀请者：" + to_string(e.fromid) + e.nick);
         });
         // 邀请加群
         procession->registerEvent<GroupInviteEvent>([](GroupInviteEvent e) {
 			e.accept();
+			Friend(MasterQQId, e.bot.id).sendMsg("收到加群邀请，群" + to_string(e.groupid) + e.groupName + "，已同意，邀请者：" + to_string(e.inviterid) + e.inviterNick);
         });
         // 消息事件
         // 监听私聊
@@ -2411,6 +2414,11 @@ public:
 					for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
 					{
 						DiceCalculatorOutput OutputReply = DiceCalculator(strEquation, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+						if (!OutputReply.complate)
+						{
+							e.sender.sendMsg(OutputReply.detail);
+							return;
+						}
 						strReply = strReply + "\n" + OutputReply.detail;
 					}
 				}
@@ -2419,6 +2427,11 @@ public:
 					for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
 					{
 						DiceCalculatorOutput OutputReply = DiceCalculator(strEquation, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+						if (!OutputReply.complate)
+						{
+							e.sender.sendMsg(OutputReply.detail);
+							return;
+						}
 						strReply = strReply + "\n" + strEquation + "=" + to_string(OutputReply.result);
 					}
 				}
@@ -2512,12 +2525,14 @@ public:
 		   while (isspace(static_cast<unsigned char>(msg[0])))
 			   msg.erase(msg.begin());
 		   string strAt = "[mirai:at:" + to_string(e.bot.id) + "]";
+		   bool botAt = false;
 		   if (msg.substr(0, 10) == "[mirai:at:")
 		   {
 			   if (msg.substr(0, strAt.length()) != strAt)
 			   {
 				   return;
 			   }
+			   botAt = true;
 			   msg = msg.substr(strAt.length());
 			   while (isspace(static_cast<unsigned char>(msg[0])))
 				   msg.erase(msg.begin());
@@ -2556,6 +2571,7 @@ public:
 			   e.sender.permission = 3;
 		   }
 		   string strLowerMessage = msg;
+		   logger->info("指令：" + msg + "\t处理开始");
 		   strLowerMessage = CDs_tolower(strLowerMessage);
 		   if (strLowerMessage.substr(intMsgCnt, 3) == "bot")
 		   {
@@ -2647,7 +2663,7 @@ public:
 				   }
 			   }
 		   }
-		   else if (DisabledGroup.count(e.group.id()))
+		   else if (DisabledGroup.count(e.group.id())&&!botAt)
 		   {
 			   return;
 		   }
@@ -5052,6 +5068,11 @@ public:
 				   for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
 				   {
 					   DiceCalculatorOutput OutputReply = DiceCalculator(strEquation, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+					   if (!OutputReply.complate)
+					   {
+						   e.group.sendMsg(OutputReply.detail);
+						   return;
+					   }
 					   strReply = strReply + "\n" + OutputReply.detail;
 				   }
 			   }
@@ -5060,6 +5081,11 @@ public:
 				   for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
 				   {
 					   DiceCalculatorOutput OutputReply = DiceCalculator(strEquation, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+					   if (!OutputReply.complate)
+					   {
+						   e.group.sendMsg(OutputReply.detail);
+						   return;
+					   }
 					   strReply = strReply + "\n" + strEquation + "=" + to_string(OutputReply.result);
 				   }
 			   }
@@ -5077,6 +5103,7 @@ public:
 		   {
 			   return;
 		   }
+		   logger->info("指令：" + msg + "\t处理完成");
 		   return;
         });
         // 监听群临时会话
@@ -5094,6 +5121,8 @@ public:
 
     void onDisable() override {
 
+		boolRunCirculate = false;
+		Sleep(11 * 1000);
 		ofstream ofstreamLMTWhite(strFileLoc + "LMTWhite.RDconf", ios::out | ios::trunc);
 		for (auto it = LMTWhiteList.begin(); it != LMTWhiteList.end(); ++it)
 		{
