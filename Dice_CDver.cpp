@@ -76,6 +76,8 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 				vector<unsigned long long>GroupList = Bot(botid).getGroupList();
 				for (vector<unsigned long long>::iterator GroupListCut = GroupList.begin(); GroupListCut != GroupList.end(); GroupListCut++)
 				{
+					int lmtRefrCut = 0;
+					string strInfo;
 					if (LmtGroupList.count(*GroupListCut))
 					{
 						if (LMTWhiteList.count(*GroupListCut))
@@ -94,10 +96,19 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 					{
 						if (!LMTWhiteList.count(*GroupListCut))
 						{
+							lmtRefrCut++;
 							IdleTimer(*GroupListCut);
-							Friend(Masterid, botid).sendMsg("发现漏网之鱼:" + to_string(*GroupListCut) + Group(*GroupListCut, botid).nickOrNameCard());
-							Sleep(1000);
+							if (lmtRefrCut <= 10)
+							{
+								Friend(Masterid, botid).sendMsg("发现漏网之鱼:" + to_string(*GroupListCut) + Group(*GroupListCut, botid).nickOrNameCard());
+								Sleep(1000);
+							}
+							logger->info("发现漏网之鱼:" + to_string(*GroupListCut));
 						}					
+					}
+					if (lmtRefrCut > 0)
+					{
+						Friend(Masterid, botid).sendMsg("发现" + to_string(lmtRefrCut) + "条漏网之鱼,已全部更新");
 					}
 				}				
 				Bot(botid).refreshInfo();
@@ -170,7 +181,7 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 				ofstream ofstreamGroupNickName(strFileLoc + "GroupNickName.RDconf", ios::out | ios::trunc);
 				for (auto it = GroupNickNameList.begin(); it != GroupNickNameList.end(); ++it)
 				{
-					for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it)
+					for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1)
 					{
 						ofstreamGroupNickName << it->first << " " << it1->first << " " << it1->second << std::endl;
 					}
@@ -258,7 +269,7 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 		{
 			LastTime.wMonth = NowTime.wMonth;
 		}
-		Sleep(60 * 1000);/*等待60s*/
+		Sleep(10 * 1000);/*等待10s*/
 	}
 	Friend(Masterid, botid).sendMsg("主循环已停止");
 	manager->detach();
@@ -429,8 +440,7 @@ public:
         // 邀请事件
         // 好友申请
         procession->registerEvent<NewFriendRequestEvent>([](NewFriendRequestEvent e) {
-			e.accept();
-			
+			e.accept();			
         });
         // 邀请加群
         procession->registerEvent<GroupInviteEvent>([](GroupInviteEvent e) {
@@ -707,6 +717,7 @@ public:
 			else if (strLowerMessage.substr(intMsgCnt, 2) == "st")
 		   {
 				intMsgCnt += 2;
+				string strDetail;//若涉及属性修改，则使用这一项
 				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 					intMsgCnt++;
 				if (intMsgCnt == strLowerMessage.length())/*.st后面什么都没有*/
@@ -805,7 +816,7 @@ public:
 					if (MultCharProp.count(e.sender.id()))
 					{
 						map<string, PropType> Allcharacter = MultCharProp[e.sender.id()];
-						if ((Allcharacter.size() >= 5) && (e.sender.id() != MasterQQId))
+						if ((Allcharacter.size() >= 10) && (e.sender.id() != MasterQQId))
 						{
 							e.sender.sendMsg(GlobalMsg[EnumErrorMsg.存储卡数量过多]);
 							return;
@@ -836,7 +847,10 @@ public:
 						string strSkillName;
 						while (intMsgCnt != strLowerMessage.length() && !isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && !
 							isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && strLowerMessage[intMsgCnt] != '=' && strLowerMessage[intMsgCnt]
-							!= ':')
+							!= ':'
+							&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '+'
+							&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '-' && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '*'
+							)
 						{
 							strSkillName += strLowerMessage[intMsgCnt];
 							intMsgCnt++;
@@ -845,16 +859,53 @@ public:
 						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '=' || strLowerMessage[intMsgCnt
 						] == ':')intMsgCnt++;
 						string strSkillVal;
-						while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						/*加入-+*d的判定 向下*/
+						while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+							|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+							|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))//修改了技能名获取的逻辑
 						{
 							strSkillVal += strLowerMessage[intMsgCnt];
 							intMsgCnt++;
 						}
-						if (strSkillName.empty() || strSkillVal.empty() || strSkillVal.length() > 3)
+						if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 						{
 							boolError = true;
 							break;
 						}
+						if (strSkillVal.find("+") != string::npos || strSkillVal.find("-") != string::npos
+							|| strSkillVal.find("*") != string::npos || strSkillVal.find("d") != string::npos)
+						{
+							if (MultCharProp.count(e.sender.id()) && MultCharProp[e.sender.id()].count(strCharName) && MultCharProp[e.sender.id()][strCharName].count(strSkillName))
+							{
+								strSkillVal = to_string(MultCharProp[e.sender.id()][strCharName][strSkillName]) + strSkillVal;
+							}
+							else if (SkillDefaultVal.count(strSkillName))
+							{
+								strSkillVal = to_string(SkillDefaultVal[strSkillName]) + strSkillVal;
+							}
+							else
+							{
+								strSkillVal = strSkillVal;
+							}
+							DiceCalculatorOutput Result = DiceCalculator(strSkillVal, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+							if (!Result.complate)
+							{
+								boolError = true;
+								break;
+							}
+							if (Result.result < 0)
+							{
+								Result.result = 0;
+							}
+							strDetail = strDetail + strSkillName + ":" + strSkillVal + "=" + to_string(Result.result) + "\n";//记录修改过程
+							strSkillVal = to_string(Result.result);
+						}
+						if (strSkillVal.length() > 3)
+						{
+							boolError = true;
+							break;
+						}
+						/*加入-+*d的判定 向上*/
 						if (!(stoi(strSkillVal) == SkillDefaultVal[strSkillName]))
 							MultCharProp[e.sender.id()][strCharName][strSkillName] = stoi(strSkillVal);
 						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
@@ -864,7 +915,12 @@ public:
 						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.技能值错误]);
 						return;
 					}
-					e.sender.sendMsg("已储存[角色卡]：" + strCharName);
+					if(strDetail.empty())
+						e.sender.sendMsg("已储存[角色卡]：" + strCharName);
+					else
+					{
+						e.sender.sendMsg("已储存[角色卡]：" + strCharName + "\n以下属性被修改\n" + strDetail.substr(0, strDetail.length() - 1));
+					}
 					return;
 				}
 				if (strLowerMessage.substr(intMsgCnt, 3) == "rmv")
@@ -999,7 +1055,10 @@ public:
 					string strSkillName;
 					while (intMsgCnt != strLowerMessage.length() && !isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && !
 						isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && strLowerMessage[intMsgCnt] != '=' && strLowerMessage[intMsgCnt]
-						!= ':')
+						!= ':'
+						&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '+'
+						&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '-' && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '*'
+						)
 					{
 						strSkillName += strLowerMessage[intMsgCnt];
 						intMsgCnt++;
@@ -1009,17 +1068,54 @@ public:
 					while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '=' || strLowerMessage[intMsgCnt
 					] == ':')intMsgCnt++;
 					string strSkillVal;
-					while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					/*加入-+*d的判定 向下*/
+					while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+						|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+						|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
 					{
 						strSkillVal += strLowerMessage[intMsgCnt];
 						intMsgCnt++;
 					}
-					if (strSkillName.empty() || strSkillVal.empty() || strSkillVal.length() > 3)
+					if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 					{
 						boolError = true;
 						break;
 					}
-					if (!(stoi(strSkillVal) == SkillDefaultVal[strSkillName]))
+					if (strSkillVal.find("+") != string::npos || strSkillVal.find("-") != string::npos
+						|| strSkillVal.find("*") != string::npos || strSkillVal.find("d") != string::npos)
+					{
+						if (CharacterProp[e.sender.id()].count(strSkillName))
+						{
+							strSkillVal = to_string(CharacterProp[e.sender.id()][strSkillName]) + strSkillVal;
+						}
+						else if (SkillDefaultVal.count(strSkillName))
+						{
+							strSkillVal = to_string(SkillDefaultVal[strSkillName]) + strSkillVal;
+						}
+						else
+						{
+							strSkillVal = strSkillVal;
+						}
+						DiceCalculatorOutput Result = DiceCalculator(strSkillVal, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+						if (!Result.complate)
+						{
+							boolError = true;
+							break;
+						}
+						if (Result.result < 0)
+						{
+							Result.result = 0;
+						}
+						strDetail = strDetail + strSkillName + ":" + strSkillVal + "=" + to_string(Result.result) + "\n";//记录修改过程
+						strSkillVal = to_string(Result.result);
+					}
+					if (strSkillVal.length() > 3)
+					{
+						boolError = true;
+						break;
+					}
+					/*加入-+*d的判定 向上*/
+					if (stoi(strSkillVal) != SkillDefaultVal[strSkillName])
 						CharacterProp[e.sender.id()][strSkillName] = stoi(strSkillVal);
 					while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
 				}
@@ -1029,8 +1125,12 @@ public:
 				}
 				else
 				{
-					e.sender.sendMsg(GlobalMsg[EnumInfoMsg.属性存储完成]);
+					if(strDetail.empty())
+						e.sender.sendMsg(GlobalMsg[EnumInfoMsg.属性存储完成]);
+					else
+						e.sender.sendMsg(GlobalMsg[EnumInfoMsg.属性存储完成] + "\n以下属性被修改\n" + strDetail.substr(0, strDetail.length() - 1));
 				}
+				return;
 		   }
 		    else if (strLowerMessage.substr(intMsgCnt, 2) == "tz")/*随机特性的部分*/
 			{
@@ -1823,7 +1923,8 @@ public:
 				string strSkillName;
 				while (intMsgCnt != strLowerMessage.length() &&
 					!isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && !isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt]))
-					)
+					&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '+'
+					&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '-' && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '*')
 				{
 					strSkillName += strLowerMessage[intMsgCnt];
 					intMsgCnt++;
@@ -2084,11 +2185,108 @@ public:
 						return;
 					}
 				}
+				else if (strLowerMessage.substr(intMsgCnt, 2) == "to")
+			    {
+					intMsgCnt += 2;
+					while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						intMsgCnt++;
+					if (strLowerMessage.substr(intMsgCnt, 5) == "group")
+					{
+						intMsgCnt += 5;
+						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+							intMsgCnt++;
+						string strGroupId;
+						while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						{
+							strGroupId += strLowerMessage[intMsgCnt];
+							intMsgCnt++;
+						}
+						if (strGroupId.empty())
+						{
+							e.sender.sendMsg("未找到群号");
+							return;
+						}
+						unsigned long long GroupId = stoi(strGroupId);
+						vector<unsigned long long>GroupList = e.bot.getGroupList();
+						vector<unsigned long long>::iterator result = find(GroupList.begin(), GroupList.end(), GroupId);
+						if (result == GroupList.end())//检测群列表里是否存在该群
+						{
+							e.sender.sendMsg("您拨打的群号是空号，请查证后再拨");
+							return;
+						}
+						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+							intMsgCnt++;
+						if (intMsgCnt != msg.length())
+						{
+							Group(GroupId, e.bot.id).sendMsg("来自Master的消息：" + msg.substr(intMsgCnt));
+							e.sender.sendMsg("消息已发送往" + Group(GroupId, e.bot.id).nickOrNameCard() + strGroupId);
+						}
+						else
+						{
+							e.sender.sendMsg("留言为空");
+						}
+					}
+					else if (strLowerMessage.substr(intMsgCnt, 6) == "friend")
+					{
+						intMsgCnt += 6;
+						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+							intMsgCnt++;
+						string strQQId;
+						while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						{
+							strQQId += strLowerMessage[intMsgCnt];
+							intMsgCnt++;
+						}
+						if (strQQId.empty())
+						{
+							e.sender.sendMsg("未找到好友ID");
+							return;
+						}
+						unsigned long long QQId = stoi(strQQId);
+						vector<unsigned long long>FriendList = e.bot.getFriendList();
+						vector<unsigned long long>::iterator result = find(FriendList.begin(), FriendList.end(), QQId);
+						if (result == FriendList.end())//检测群列表里是否存在该群
+						{
+							e.sender.sendMsg("您拨打的好友是空号，请查证后再拨");
+							return;
+						}
+						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+							intMsgCnt++;
+						if (intMsgCnt != msg.length())
+						{
+							Friend(QQId, e.bot.id).sendMsg("来自Master的消息：" + msg.substr(intMsgCnt));
+							e.sender.sendMsg("消息已发送往" + Friend(QQId, e.bot.id).nickOrNameCard() + strQQId);
+						}
+						else
+						{
+							e.sender.sendMsg("留言为空");
+						}
+					}
+					else
+					 {
+
+					 }
+				}
 				else
 				{
 					return;
 				}
 
+			}
+			else if (strLowerMessage.substr(intMsgCnt, 8) == "tomaster")
+		   {
+			 intMsgCnt += 8;
+			  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				   intMsgCnt++;
+			  if (intMsgCnt != msg.length())
+			  {
+				   Friend(MasterQQId, e.bot.id).sendMsg("来自群" + e.sender.nickOrNameCard() + to_string(e.sender.id()) + "的消息\n" + msg.substr(intMsgCnt));
+				   e.sender.sendMsg("好的，话我已经传达给柴刀了");
+			   }
+			   else
+			   {
+				   e.sender.sendMsg("我不知道你想告诉柴刀什么");
+			   }
 			}
 			else if (strLowerMessage[intMsgCnt] == 'n')
 			{
@@ -2189,8 +2387,12 @@ public:
 				}
 				if (strEquation.length() == 0)
 				{
-					e.sender.sendMsg("没有找到算式或者有空的括号，但费用我就收下啦");
-					return;
+					if (DefaultDice.count(e.sender.id()))
+					{
+						strEquation = "d" + to_string(DefaultDice[e.sender.id()]);
+					}
+					else
+						strEquation = "d100";
 				}
 				if (intMsgCnt != strLowerMessage.length())
 					strReason = msg.substr(intMsgCnt);
@@ -2886,6 +3088,7 @@ public:
 		   {
 			   IdleTimer(e.group.id());
 			   intMsgCnt += 2;
+			   string strDetail;//若涉及属性修改，则使用这一项
 			   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 				   intMsgCnt++;
 			   if (intMsgCnt == strLowerMessage.length())/*.st后面什么都没有*/
@@ -2990,7 +3193,7 @@ public:
 				   if (MultCharProp.count(e.sender.id()))
 				   {
 					   map<string, PropType> Allcharacter = MultCharProp[e.sender.id()];
-					   if ((Allcharacter.size() >= 5) && (e.sender.id() != MasterQQId))
+					   if ((Allcharacter.size() >= 10) && (e.sender.id() != MasterQQId))
 					   {
 						   e.group.sendMsg(GlobalMsg[EnumErrorMsg.存储卡数量过多]);
 						   return;
@@ -3021,7 +3224,10 @@ public:
 					   string strSkillName;
 					   while (intMsgCnt != strLowerMessage.length() && !isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && !
 						   isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && strLowerMessage[intMsgCnt] != '=' && strLowerMessage[intMsgCnt]
-						   != ':')
+						   != ':'
+						   && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '+'
+						   && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '-' && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '*'
+						   )
 					   {
 						   strSkillName += strLowerMessage[intMsgCnt];
 						   intMsgCnt++;
@@ -3030,16 +3236,53 @@ public:
 					   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '=' || strLowerMessage[intMsgCnt
 					   ] == ':')intMsgCnt++;
 					   string strSkillVal;
-					   while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					   /*加入-+*d的判定 向下*/
+					   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+						   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+						   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))//修改了技能名获取的逻辑
 					   {
 						   strSkillVal += strLowerMessage[intMsgCnt];
 						   intMsgCnt++;
 					   }
-					   if (strSkillName.empty() || strSkillVal.empty() || strSkillVal.length() > 3)
+					   if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 					   {
 						   boolError = true;
 						   break;
 					   }
+					   if (strSkillVal.find("+") != string::npos || strSkillVal.find("-") != string::npos
+						   || strSkillVal.find("*") != string::npos || strSkillVal.find("d") != string::npos)
+					   {
+						   if (MultCharProp.count(e.sender.id()) && MultCharProp[e.sender.id()].count(strCharName) && MultCharProp[e.sender.id()][strCharName].count(strSkillName))
+						   {
+							   strSkillVal = to_string(MultCharProp[e.sender.id()][strCharName][strSkillName]) + strSkillVal;
+						   }
+						   else if (SkillDefaultVal.count(strSkillName))
+						   {
+							   strSkillVal = to_string(SkillDefaultVal[strSkillName]) + strSkillVal;
+						   }
+						   else
+						   {
+							   strSkillVal = strSkillVal;
+						   }
+						   DiceCalculatorOutput Result = DiceCalculator(strSkillVal, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+						   if (!Result.complate)
+						   {
+							   boolError = true;
+							   break;
+						   }
+						   if (Result.result < 0)
+						   {
+							   Result.result = 0;
+						   }
+						   strDetail = strDetail + strSkillName + ":" + strSkillVal + "=" + to_string(Result.result) + "\n";//记录修改过程
+						   strSkillVal = to_string(Result.result);
+					   }
+					   if (strSkillVal.length() > 3)
+					   {
+						   boolError = true;
+						   break;
+					   }
+					   /*加入-+*d的判定 向上*/
 					   if (!(stoi(strSkillVal) == SkillDefaultVal[strSkillName]))
 						   MultCharProp[e.sender.id()][strCharName][strSkillName] = stoi(strSkillVal);
 					   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
@@ -3049,7 +3292,10 @@ public:
 					   e.group.sendMsg(GlobalMsg[EnumErrorMsg.技能值错误]);
 					   return;
 				   }
-				   e.group.sendMsg("已储存[角色卡]：" + strCharName);
+				   if (strDetail.empty())
+					   e.group.sendMsg("已储存[角色卡]：" + strCharName);
+				   else
+					   e.group.sendMsg("已储存[角色卡]：" + strCharName + "\n以下属性被修改\n" + strDetail.substr(0, strDetail.length() - 1));
 				   return;
 			   }
 			   if (strLowerMessage.substr(intMsgCnt, 3) == "rmv")
@@ -3330,7 +3576,10 @@ public:
 				   string strSkillName;
 				   while (intMsgCnt != strLowerMessage.length() && !isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && !
 					   isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && strLowerMessage[intMsgCnt] != '=' && strLowerMessage[intMsgCnt]
-					   != ':')
+					   != ':'
+					   && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '+'
+					   && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '-' && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '*'
+					   )
 				   {
 					   strSkillName += strLowerMessage[intMsgCnt];
 					   intMsgCnt++;
@@ -3340,17 +3589,54 @@ public:
 				   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '=' || strLowerMessage[intMsgCnt
 				   ] == ':')intMsgCnt++;
 				   string strSkillVal;
-				   while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				   /*加入-+*d的判定 向下*/
+				   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+					   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+					   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
 				   {
 					   strSkillVal += strLowerMessage[intMsgCnt];
 					   intMsgCnt++;
 				   }
-				   if (strSkillName.empty() || strSkillVal.empty() || strSkillVal.length() > 3)
+				   if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 				   {
 					   boolError = true;
 					   break;
 				   }
-				   if (!(stoi(strSkillVal) == SkillDefaultVal[strSkillName]))
+				   if (strSkillVal.find("+") != string::npos|| strSkillVal.find("-") != string::npos
+					   || strSkillVal.find("*") != string::npos|| strSkillVal.find("d") != string::npos)
+				   {
+					   if (CharacterProp[e.sender.id()].count(strSkillName))
+					   {
+						   strSkillVal = to_string(CharacterProp[e.sender.id()][strSkillName]) + strSkillVal;
+					   }
+					   else if (SkillDefaultVal.count(strSkillName))
+					   {
+						   strSkillVal = to_string(SkillDefaultVal[strSkillName]) + strSkillVal;
+					   }
+					   else
+					   {
+						   strSkillVal = strSkillVal;
+					   }
+					   DiceCalculatorOutput Result = DiceCalculator(strSkillVal, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+					   if (!Result.complate)
+					   {
+						   boolError = true;
+						   break;
+					   }
+					   if (Result.result < 0)
+					   {
+						   Result.result = 0;
+					   }
+					   strDetail = strDetail + strSkillName + ":" + strSkillVal + "=" + to_string(Result.result) + "\n";//记录修改过程
+					   strSkillVal = to_string(Result.result);
+				   }
+				   if (strSkillVal.length() > 3)
+				   {
+					   boolError = true;
+					   break;
+				   }
+				   /*加入-+*d的判定 向上*/
+				   if (stoi(strSkillVal) != SkillDefaultVal[strSkillName])
 					   CharacterProp[e.sender.id()][strSkillName] = stoi(strSkillVal);
 				   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
 			   }
@@ -3360,7 +3646,10 @@ public:
 			   }
 			   else
 			   {
-				   e.group.sendMsg(GlobalMsg[EnumInfoMsg.属性存储完成]);
+				   if (strDetail.empty())
+					   e.group.sendMsg(GlobalMsg[EnumInfoMsg.属性存储完成]);
+				   else
+					   e.group.sendMsg(GlobalMsg[EnumInfoMsg.属性存储完成] + "\n以下属性被修改\n" + strDetail.substr(0, strDetail.length() - 1));
 			   }
 		   }
 		   else if (strLowerMessage.substr(intMsgCnt, 2) == "tz")/*随机特性的部分*/
@@ -4202,7 +4491,8 @@ public:
 				string strSkillName;
 				while (intMsgCnt != strLowerMessage.length() &&
 					!isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) && !isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt]))
-					)
+					&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '+'
+					&& static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '-' && static_cast<unsigned char>(strLowerMessage[intMsgCnt]) != '*')
 				{
 					strSkillName += strLowerMessage[intMsgCnt];
 					intMsgCnt++;
@@ -4451,7 +4741,7 @@ public:
 						   e.group.sendMsg("试图加入LMT白名单的群号为空");
 						   return;
 					   }
-					   int intGroupNum = stoi(strGroupNum);
+					   unsigned long long intGroupNum = stoi(strGroupNum);
 					   if (LMTWhiteList.count(intGroupNum))
 					   {
 						   e.group.sendMsg("该群已存在在LMT白名单中");
@@ -4481,7 +4771,7 @@ public:
 						   e.group.sendMsg("试图移除LMT白名单的群号为空");
 						   return;
 					   }
-					   int intGroupNum = stoi(strGroupNum);
+					   unsigned long long intGroupNum = stoi(strGroupNum);
 					   if (!LMTWhiteList.count(intGroupNum))
 					   {
 						   e.group.sendMsg("该群不在LMT白名单中");
@@ -4497,11 +4787,109 @@ public:
 					   return;
 				   }
 			   }
+			   else if (strLowerMessage.substr(intMsgCnt, 2) == "to")
+			   {
+				  intMsgCnt += 2;
+				  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					  intMsgCnt++;
+				  if (strLowerMessage.substr(intMsgCnt, 5) == "group")
+				  {
+					  intMsgCnt += 5;
+					  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						  intMsgCnt++;
+					  string strGroupId;
+					  while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					  {
+						  strGroupId += strLowerMessage[intMsgCnt];
+						  intMsgCnt++;
+					  }
+					  if (strGroupId.empty())
+					  {
+						  e.group.sendMsg("未找到群号");
+						  return;
+					  }
+					  unsigned long long GroupId = stoi(strGroupId);
+					  vector<unsigned long long>GroupList = e.bot.getGroupList();
+					  vector<unsigned long long>::iterator result = find(GroupList.begin(), GroupList.end(), GroupId);
+					  if (result == GroupList.end())//检测群列表里是否存在该群
+					  {
+						  e.group.sendMsg("您拨打的群号是空号，请查证后再拨");
+						  return;
+					  }
+					  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						  intMsgCnt++;
+					  if (intMsgCnt != msg.length())
+					  {
+						  Group(GroupId, e.bot.id).sendMsg("来自Master的消息：" + msg.substr(intMsgCnt));
+						  e.group.sendMsg("消息已发送往" + Group(GroupId, e.bot.id).nickOrNameCard() + strGroupId);
+					  }
+					  else
+					  {
+						  e.group.sendMsg("留言为空");
+					  }
+				  }
+				  else if (strLowerMessage.substr(intMsgCnt, 6) == "friend")
+				  {
+					  intMsgCnt += 6;
+					  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						  intMsgCnt++;
+					  string strQQId;
+					  while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					  {
+						  strQQId += strLowerMessage[intMsgCnt];
+						  intMsgCnt++;
+					  }
+					  if (strQQId.empty())
+					  {
+						  e.group.sendMsg("未找到好友ID");
+						  return;
+					  }
+					  unsigned long long QQId = stoi(strQQId);
+					  vector<unsigned long long>FriendList = e.bot.getFriendList();
+					  vector<unsigned long long>::iterator result = find(FriendList.begin(), FriendList.end(), QQId);
+					  if (result == FriendList.end())//检测群列表里是否存在该群
+					  {
+						  e.group.sendMsg("您拨打的好友是空号，请查证后再拨");
+						  return;
+					  }
+					  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						  intMsgCnt++;
+					  if (intMsgCnt != msg.length())
+					  {
+						  Friend(QQId, e.bot.id).sendMsg("来自Master的消息：" + msg.substr(intMsgCnt));
+						  e.group.sendMsg("消息已发送往" + Friend(QQId, e.bot.id).nickOrNameCard() + strQQId);
+					  }
+					  else
+					  {
+						  e.group.sendMsg("留言为空");
+					  }
+				  }
+				  else
+				  {
+
+				  }
+	
+				}
 			   else
 			   {
 				   return;
 			   }
 
+			}
+		   else if (strLowerMessage.substr(intMsgCnt, 8) == "tomaster")
+		   {
+				 intMsgCnt += 8;
+				 while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					 intMsgCnt++;
+				 if (intMsgCnt != msg.length())
+				 {
+					 Friend(MasterQQId, e.bot.id).sendMsg("来自群" + e.group.nickOrNameCard() + to_string(e.group.id()) +"的" + e.sender.nickOrNameCard() + to_string(e.sender.id()) + "的消息\n" + msg.substr(intMsgCnt));
+					 e.group.sendMsg("好的，话我已经传达给柴刀了");
+				 }
+				 else
+				 {
+					 e.group.sendMsg("我不知道你想告诉柴刀什么");
+				 }
 			}
 		   else if (strLowerMessage[intMsgCnt] == 'n')
 		   {
@@ -4640,8 +5028,12 @@ public:
 			   }
 			   if (strEquation.length() == 0)
 			   {
-				   e.group.sendMsg("没有找到算式或者有空的括号，但费用我就收下啦");
-				   return;
+				   if (DefaultDice.count(e.sender.id()))
+				   {
+					   strEquation = "d" + to_string(DefaultDice[e.sender.id()]);
+				   }
+				   else
+					   strEquation = "d100";
 			   }
 			   if (intMsgCnt != strLowerMessage.length())
 				   strReason = msg.substr(intMsgCnt);
@@ -4733,7 +5125,7 @@ public:
 		ofstream ofstreamGroupNickName(strFileLoc + "GroupNickName.RDconf", ios::out | ios::trunc);
 		for (auto it = GroupNickNameList.begin(); it != GroupNickNameList.end(); ++it)
 		{
-			for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it)
+			for (auto it1 = it->second.begin(); it1 != it->second.end(); ++it1)
 			{
 				ofstreamGroupNickName << it->first << " " << it1->first << " " << it1->second << std::endl;
 			}
