@@ -863,12 +863,23 @@ public:
 						] == ':')intMsgCnt++;
 						string strSkillVal;
 						/*加入-+*d的判定 向下*/
-						while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
-							|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
-							|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))//修改了技能名获取的逻辑
+						if (static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*')
 						{
-							strSkillVal += strLowerMessage[intMsgCnt];
-							intMsgCnt++;
+							while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+								|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+								|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
+							{
+								strSkillVal += strLowerMessage[intMsgCnt];
+								intMsgCnt++;
+							}
+						}
+						else
+						{
+							while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt]))))
+							{
+								strSkillVal += strLowerMessage[intMsgCnt];
+								intMsgCnt++;
+							}
 						}
 						if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 						{
@@ -1072,12 +1083,23 @@ public:
 					] == ':')intMsgCnt++;
 					string strSkillVal;
 					/*加入-+*d的判定 向下*/
-					while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
-						|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
-						|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
+					if (static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*')
 					{
-						strSkillVal += strLowerMessage[intMsgCnt];
-						intMsgCnt++;
+						while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+							|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+							|| static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
+						{
+							strSkillVal += strLowerMessage[intMsgCnt];
+							intMsgCnt++;
+						}
+					}
+					else
+					{
+						while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt]))))
+						{
+							strSkillVal += strLowerMessage[intMsgCnt];
+							intMsgCnt++;
+						}
 					}
 					if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 					{
@@ -3253,12 +3275,23 @@ public:
 					   ] == ':')intMsgCnt++;
 					   string strSkillVal;
 					   /*加入-+*d的判定 向下*/
-					   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
-						   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
-						   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))//修改了技能名获取的逻辑
+					   if (static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*')
 					   {
-						   strSkillVal += strLowerMessage[intMsgCnt];
-						   intMsgCnt++;
+						   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+							   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+							   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
+						   {
+							   strSkillVal += strLowerMessage[intMsgCnt];
+							   intMsgCnt++;
+						   }
+					   }
+					   else
+					   {
+						   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt]))))
+						   {
+							   strSkillVal += strLowerMessage[intMsgCnt];
+							   intMsgCnt++;
+						   }
 					   }
 					   if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 					   {
@@ -3606,12 +3639,23 @@ public:
 				   ] == ':')intMsgCnt++;
 				   string strSkillVal;
 				   /*加入-+*d的判定 向下*/
-				   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
-					   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
-					   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
+				   if (static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*')
 				   {
-					   strSkillVal += strLowerMessage[intMsgCnt];
-					   intMsgCnt++;
+					   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '+'
+						   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '-' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == '*'
+						   || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'd'))
+					   {
+						   strSkillVal += strLowerMessage[intMsgCnt];
+						   intMsgCnt++;
+					   }
+				   }
+				   else
+				   {
+					   while (intMsgCnt != strLowerMessage.length() && (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt]))))
+					   {
+						   strSkillVal += strLowerMessage[intMsgCnt];
+						   intMsgCnt++;
+					   }
 				   }
 				   if (strSkillName.empty() || strSkillVal.empty())//移动大小判断到下方
 				   {
