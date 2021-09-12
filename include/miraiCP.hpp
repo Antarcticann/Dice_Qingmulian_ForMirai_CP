@@ -44,7 +44,7 @@ namespace MiraiCP {
     using QQID = unsigned long long;
     // 开始声明MiraiCP常量声明代码
     /// MiraiCP当前版本
-    const std::string MiraiCPVersion = "v2.7.0";
+    const std::string MiraiCPVersion = "v2.7.0-patch-1";
 
     /// @brief 插件信息
     class PluginConfig{
@@ -309,6 +309,9 @@ LightApp风格1
         /// @param s
         /// @return
         static std::string escapeToMiraiCode(const std::string &s);
+
+        /// starts_with, from <https://stackoverflow.com/questions/1878001/how-do-i-check-if-a-c-stdstring-starts-with-a-certain-string-and-convert-a>
+        static bool starts_with(const std::string& f, const std::string& s){return f.rfind(s, 0) == 0;}
     };
 
 /// @brief 配置类声明, 主要存放各种jmethodid, MiraiCP内部使用, 不需要更改或其他操作
@@ -1699,7 +1702,7 @@ LightApp风格1
         /// 删除好友(delete是C++关键字
         void deleteFriend(JNIEnv *env = manager->getEnv()) {
             nlohmann::json j;
-            j["contactSource"] = this->serializationToString();
+            j["source"] = this->serializationToString();
             j["quit"] = true;
             ErrorHandle(config->koperation(config->RefreshInfo, j, env));
         }
@@ -1998,7 +2001,7 @@ LightApp风格1
 
         void quit(JNIEnv *env = manager->getEnv()) {
             nlohmann::json j;
-            j["contactSource"] = this->serializationToString();
+            j["source"] = this->serializationToString();
             j["quit"] = true;
             ErrorHandle(config->koperation(config->RefreshInfo, j, env));
         }
@@ -2343,9 +2346,9 @@ LightApp风格1
          * @param operaterid 操作人id, 主动退出时与member相同，该成员可能是当前bot，名称为operater以与系统operator区分
          */
         MemberLeaveEvent(QQID botid, int type, QQID memberid,
-                         const Group &group,
+                         Group group,
                          QQID operaterid) : BotEvent(botid), type(type), memberid(memberid),
-                                                                 group(group),
+                                                                 group(std::move(group)),
                                                                  operaterid(operaterid) {}
     };
 
@@ -2379,10 +2382,10 @@ LightApp风格1
          * @param groupid
          */
         RecallEvent(QQID botid, int type, int time, QQID authorid,
-                    QQID operatorid, std::string ids, const std::string &internalids,
+                    QQID operatorid, std::string ids, std::string internalids,
                     QQID groupid) : BotEvent(botid), type(type), time(time), authorid(authorid),
                                                             operatorid(operatorid), ids(std::move(ids)),
-                                                            internalids(internalids),
+                                                            internalids(std::move(internalids)),
                                                             groupid(groupid) {}
     };
 
@@ -2467,7 +2470,7 @@ LightApp风格1
     public:
         /// 谁发送的
         Contact from;
-        NudgeEvent(Contact c, QQID botid):BotEvent(botid){}
+        NudgeEvent(const Contact& c, QQID botid):BotEvent(botid){}
     };
 
 /**监听类声明*/
@@ -3031,7 +3034,7 @@ throw: InitxException 即找不到对应签名
         ErrorHandle(re, "reach a error area, Contact::SendMiraiCode");
         if(re == "ET")
             throw TimeOutException("发送消息过于频繁导致的tx服务器未能即使响应, 位置: Contact::SendMsg");
-        if(re.starts_with("EBM"))
+        if(Tools::starts_with(re, "EBM"))
             throw BotIsBeingMutedException(std::stoi(re.substr(3)));
         return MessageSource::deserializeFromString(re);
     }
@@ -3251,7 +3254,7 @@ throw: InitxException 即找不到对应签名
 
     Message PrivateMessageEvent::nextMessage(long time, bool halt, JNIEnv* env) {
         json j;
-        j["contactsource"] = this->sender.serializationToString();
+        j["contactSource"] = this->sender.serializationToString();
         j["time"] = time;
         j["halt"] = halt;
         std::string r = config->koperation(config->NextMsg, j, env);
@@ -3263,7 +3266,7 @@ throw: InitxException 即找不到对应签名
 
     Message GroupMessageEvent::nextMessage(long time, bool halt, JNIEnv *env) {
         json j;
-        j["contactsource"] = this->group.serializationToString();
+        j["contactSource"] = this->group.serializationToString();
         j["time"] = time;
         j["halt"] = halt;
         std::string r = config->koperation(config->NextMsg, j, env);
@@ -3275,7 +3278,7 @@ throw: InitxException 即找不到对应签名
 
     Message GroupMessageEvent::senderNextMessage(long time, bool halt, JNIEnv *env) {
         json j;
-        j["contactsource"] = this->sender.serializationToString();
+        j["contactSource"] = this->sender.serializationToString();
         j["time"] = time;
         j["halt"] = halt;
         std::string r = config->koperation(config->NextMsg, j, env);

@@ -250,6 +250,13 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 				}
 				ofstreamRoomRule.close();
 				logger->info("村规存储完成");
+				ofstream ofstreamDefaultDice(strFileLoc + "DefaultDice.RDconf", ios::out | ios::trunc);
+				for (auto it = DefaultDice.begin(); it != DefaultDice.end(); ++it)
+				{
+					ofstreamDefaultDice << it->first << " " << it->second << std::endl;
+				}
+				ofstreamDefaultDice.close();
+				logger->info("默认骰存储完成");
 				/*插件结束*/
 			}
 		}
@@ -280,7 +287,7 @@ void MainCirculate(unsigned long long Masterid, unsigned long long botid) {
 class Main:public CPPPlugin {
 public:
     // 配置插件信息
-    Main() : CPPPlugin(PluginConfig("Dice!_CD.ver （per-alpha）", "0.2", "测不准柴刀|QQ 429189622", "基于Dice!by 溯洄制作，有大量魔改", "2021")) {}
+    Main() : CPPPlugin(PluginConfig("Dice!_CD.ver_Beta", "2.1", "测不准柴刀|QQ 429189622", "基于Dice!by 溯洄制作，有大量魔改", "2021")) {}
     void onEnable() override {
         /*插件启动, 请勿在此函数运行前执行操作mirai的代码*/
         /*
@@ -436,6 +443,19 @@ public:
             }
             ifstreamRoonRule.close();
 			e.botlogger.info("村规读取完成");
+			ifstream ifstreamDefaultDice(strFileLoc + "DefaultDice.RDconf");
+			if (ifstreamDefaultDice)
+			{
+				unsigned long long QQID;
+				unsigned int intDefaultDice;
+				while (ifstreamDefaultDice >> QQID >> intDefaultDice)
+				{
+					DefaultDice[QQID] = intDefaultDice;
+				}
+			}
+			ifstreamDefaultDice.close();
+			e.botlogger.info("默认骰读取完成");
+
             e.botlogger.info("目前以名称检索的酒品名单上的酒品分别有这么多：" + BackCocktailList());
         });
         // 邀请事件
@@ -920,8 +940,19 @@ public:
 							break;
 						}
 						/*加入-+*d的判定 向上*/
-						if (!(stoi(strSkillVal) == SkillDefaultVal[strSkillName]))
+						if (stoi(strSkillVal) == SkillDefaultVal[strSkillName])
+						{
+							if (MultCharProp.count(e.sender.id()) 
+								&& MultCharProp[e.sender.id()].count(strCharName) 
+								&& MultCharProp[e.sender.id()][strCharName].count(strSkillName))
+							{
+								MultCharProp[e.sender.id()][strCharName].erase(strSkillName);
+							}
+						}
+						else
+						{
 							MultCharProp[e.sender.id()][strCharName][strSkillName] = stoi(strSkillVal);
+						}
 						while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
 					}
 					if (boolError)
@@ -1140,8 +1171,17 @@ public:
 						break;
 					}
 					/*加入-+*d的判定 向上*/
-					if (stoi(strSkillVal) != SkillDefaultVal[strSkillName])
+					if (stoi(strSkillVal) == SkillDefaultVal[strSkillName])
+					{
+						if (CharacterProp.count(e.sender.id()) && CharacterProp[e.sender.id()].count(strSkillName))
+						{
+							CharacterProp[e.sender.id()].erase(strSkillName);
+						}
+					}
+					else
+					{
 						CharacterProp[e.sender.id()][strSkillName] = stoi(strSkillVal);
+					}
 					while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
 				}
 				if (boolError)
@@ -1222,6 +1262,37 @@ public:
 			else if (strLowerMessage.substr(intMsgCnt, 2) == "ra")
 		   {
 				intMsgCnt += 2;
+				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					intMsgCnt++;
+				int intMultDice = 1, intFindMultDiceCut = intMsgCnt;
+				string strMultDice;
+				while (intFindMultDiceCut != strLowerMessage.length()
+					&& isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]))
+					&& intFindMultDiceCut <= intMsgCnt + 3)
+				{
+					if (isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
+					{
+						strMultDice += strLowerMessage[intFindMultDiceCut];
+					}
+					intFindMultDiceCut++;
+				}
+				if (intFindMultDiceCut != strLowerMessage.length() && static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]) == '#')
+				{
+					if (strMultDice.length() == 0)
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数无效]);
+						return;
+					}
+					intMultDice = stoi(strMultDice);
+					if (intMultDice > 10)
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数过多]);
+						return;
+					}
+					intMsgCnt = intFindMultDiceCut;
+					intMsgCnt++;
+				}
+
 				bool setporb = 0, isPunish = 1;/*下面是修改的部分mark(包括本行*/
 				string strpbNum;
 				int intpbNum = 1;
@@ -1261,36 +1332,20 @@ public:
 					intMsgCnt++;
 				}
 				if (SkillNameReplace.count(strSkillName))strSkillName = SkillNameReplace[strSkillName];/*取得标准技能名称*/
-				signed int intcorrection = 0;/*补正数据读取*/
-				if (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-')
-				{
-					if (strLowerMessage[intMsgCnt] == '+')
-					{
-						intcorrection = 1;
-					}
-					else
-					{
-						intcorrection = -1;
-					}
+				 /*补正数据读取开始*/
+				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 					intMsgCnt++;
-					string strCorrection;
-					while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				string strCorrection;
+				if (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*')
+				{
+					while (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*'
+						|| isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 					{
 						strCorrection += strLowerMessage[intMsgCnt];
 						intMsgCnt++;
 					}
-					if (strCorrection.empty())
-						intcorrection = 0;
-					else if (strCorrection.length() > 2)
-					{
-						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.技能值错误]);
-						return;
-					}
-					else
-					{
-						intcorrection *= stoi(strCorrection);
-					}
-				}/*补正数据读取结束*/
+				}
+				/*补正数据读取结束*/
 				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '=' || strLowerMessage[intMsgCnt] == ':')
 					intMsgCnt++;
 				string strSkillVal;
@@ -1331,137 +1386,149 @@ public:
 				{
 					intSkillVal = stoi(strSkillVal);
 				}
-				if (intcorrection)/*数据补正*/
+				if (!strCorrection.empty())/*数据补正录入*/
 				{
-					intSkillVal += intcorrection;
-				}
-				int intD100Res = RandomGenerator::Randint(1, 100);
-				string strReply = strNickName + "进行" + strSkillName + "检定: D100=" + to_string(intD100Res);/*下面是修改的部分mark(包括本行*/
-				if (setporb)
-				{
-					int pbRandom, single_figures;
-					string pbShow = "";
-					if (intD100Res == 100)
-						single_figures = 0;
-					else
-						single_figures = intD100Res % 10;
-					if (isPunish)
+					DiceCalculatorOutput Result = DiceCalculator(to_string(intSkillVal) + strCorrection, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+					if (Result.complate)
 					{
-						pbShow = "（惩罚骰：";
-						for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
-						{
-							pbRandom = RandomGenerator::Randint(0, 9);
-							pbShow = pbShow + " " + to_string(pbRandom);
-							if ((pbRandom == 0) && (single_figures == 0))
-								pbRandom = 10;
-							pbRandom = pbRandom * 10;
-							if (pbRandom > intD100Res)
-								intD100Res = pbRandom + single_figures;
-						}
+						intSkillVal = Result.result;
 					}
 					else
 					{
-						pbShow = "（奖励骰：";
-						for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
-						{
-							pbRandom = RandomGenerator::Randint(0, 9);
-							pbShow = pbShow + " " + to_string(pbRandom);
-							if ((pbRandom == 0) && (single_figures == 0))
-								pbRandom = 10;
-							pbRandom = pbRandom * 10;
-							if (pbRandom < intD100Res)
-								intD100Res = pbRandom + single_figures;
-						}
-					}
-					pbShow = pbShow + "），最终结果是：" + to_string(intD100Res);
-					strReply += pbShow + "/" + to_string(intSkillVal) + " ";
-				}
-				else
-					strReply += "/" + to_string(intSkillVal) + " ";
-				int RoomRuleNum = 5;/*自定义房规部分（包括此行向下*/
-				/*上面是修改的部分mark(包括本行*/
-
-				if (RoomRuleNum == 101)//公式书规则检定
-				{
-					if (intD100Res == 1 && intD100Res <= intSkillVal)
-					{
-						strReply += GlobalMsg[EnumInfoMsg.大成功];
-					}
-					else if (intD100Res <= (intSkillVal / 5))
-					{
-						strReply += GlobalMsg[EnumInfoMsg.极难成功];
-					}
-					else if (intD100Res <= (intSkillVal / 2))
-					{
-						strReply += GlobalMsg[EnumInfoMsg.困难成功];
-					}
-					else if (intD100Res <= intSkillVal)
-					{
-						strReply += GlobalMsg[EnumInfoMsg.成功];
-					}
-					else
-					{
-						if (50 <= intSkillVal)/*技能大于50*/
-						{
-							if (intD100Res <= 99)
-							{
-								strReply += GlobalMsg[EnumInfoMsg.失败];
-							}
-							else
-							{
-								strReply += GlobalMsg[EnumInfoMsg.大失败];
-							}
-						}
-						else
-						{
-							if (intD100Res <= 95)
-							{
-								strReply += GlobalMsg[EnumInfoMsg.失败];
-							}
-							else
-							{
-								strReply += GlobalMsg[EnumInfoMsg.大失败];
-							}
-						}
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰表达式错误]);
 					}
 				}
-				else
-				{
-					if (intD100Res <= intSkillVal)/*成功*/
-					{
-						if (intD100Res <= RoomRuleNum)
-						{
-							strReply += GlobalMsg[EnumInfoMsg.大成功];
-						}
-						else if (intD100Res <= intSkillVal / 5)
-						{
-							strReply += GlobalMsg[EnumInfoMsg.极难成功];
-						}
-						else if (intD100Res <= intSkillVal / 2)
-						{
-							strReply += GlobalMsg[EnumInfoMsg.困难成功];
-						}
-						else
-						{
-							strReply += GlobalMsg[EnumInfoMsg.成功];
-						}
-					}
-					else/*失败*/
-					{
-						if (intD100Res >= (101 - RoomRuleNum))
-						{
-							strReply += GlobalMsg[EnumInfoMsg.大失败];
-						}
-						else
-						{
-							strReply += GlobalMsg[EnumInfoMsg.失败];
-						}
-					}
-				}
-
+				string strReply = strNickName + "进行" + strSkillName + "检定:";
 				if (!strReason.empty())
 				{
 					strReply = "由于" + strReason + " " + strReply;
+				}
+				for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
+				{
+					int intD100Res = RandomGenerator::Randint(1, 100);
+					strReply = strReply + "\nD100 = " + to_string(intD100Res);/*下面是修改的部分mark(包括本行*/
+					if (setporb)
+					{
+						int pbRandom, single_figures;
+						string pbShow = "";
+						if (intD100Res == 100)
+							single_figures = 0;
+						else
+							single_figures = intD100Res % 10;
+						if (isPunish)
+						{
+							pbShow = "（惩罚骰：";
+							for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
+							{
+								pbRandom = RandomGenerator::Randint(0, 9);
+								pbShow = pbShow + to_string(pbRandom) + " ";
+								if ((pbRandom == 0) && (single_figures == 0))
+									pbRandom = 10;
+								pbRandom = pbRandom * 10;
+								if (pbRandom > intD100Res)
+									intD100Res = pbRandom + single_figures;
+							}
+						}
+						else
+						{
+							pbShow = "（奖励骰：";
+							for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
+							{
+								pbRandom = RandomGenerator::Randint(0, 9);
+								pbShow = pbShow + to_string(pbRandom) + " ";
+								if ((pbRandom == 0) && (single_figures == 0))
+									pbRandom = 10;
+								pbRandom = pbRandom * 10;
+								if (pbRandom < intD100Res)
+									intD100Res = pbRandom + single_figures;
+							}
+						}
+						pbShow.pop_back();
+						pbShow = pbShow + "），最终结果是：" + to_string(intD100Res);
+						strReply += pbShow + "/" + to_string(intSkillVal) + " ";
+					}
+					else
+						strReply += "/" + to_string(intSkillVal) + " ";
+					int RoomRuleNum = 5;/*自定义房规部分（包括此行向下*/
+					/*上面是修改的部分mark(包括本行*/
+
+					if (RoomRuleNum == 101)//公式书规则检定
+					{
+						if (intD100Res == 1 && intD100Res <= intSkillVal)
+						{
+							strReply += GlobalMsg[EnumInfoMsg.大成功];
+						}
+						else if (intD100Res <= (intSkillVal / 5))
+						{
+							strReply += GlobalMsg[EnumInfoMsg.极难成功];
+						}
+						else if (intD100Res <= (intSkillVal / 2))
+						{
+							strReply += GlobalMsg[EnumInfoMsg.困难成功];
+						}
+						else if (intD100Res <= intSkillVal)
+						{
+							strReply += GlobalMsg[EnumInfoMsg.成功];
+						}
+						else
+						{
+							if (50 <= intSkillVal)/*技能大于50*/
+							{
+								if (intD100Res <= 99)
+								{
+									strReply += GlobalMsg[EnumInfoMsg.失败];
+								}
+								else
+								{
+									strReply += GlobalMsg[EnumInfoMsg.大失败];
+								}
+							}
+							else
+							{
+								if (intD100Res <= 95)
+								{
+									strReply += GlobalMsg[EnumInfoMsg.失败];
+								}
+								else
+								{
+									strReply += GlobalMsg[EnumInfoMsg.大失败];
+								}
+							}
+						}
+					}
+					else
+					{
+						if (intD100Res <= intSkillVal)/*成功*/
+						{
+							if (intD100Res <= RoomRuleNum)
+							{
+								strReply += GlobalMsg[EnumInfoMsg.大成功];
+							}
+							else if (intD100Res <= intSkillVal / 5)
+							{
+								strReply += GlobalMsg[EnumInfoMsg.极难成功];
+							}
+							else if (intD100Res <= intSkillVal / 2)
+							{
+								strReply += GlobalMsg[EnumInfoMsg.困难成功];
+							}
+							else
+							{
+								strReply += GlobalMsg[EnumInfoMsg.成功];
+							}
+						}
+						else/*失败*/
+						{
+							if (intD100Res >= (101 - RoomRuleNum))
+							{
+								strReply += GlobalMsg[EnumInfoMsg.大失败];
+							}
+							else
+							{
+								strReply += GlobalMsg[EnumInfoMsg.失败];
+							}
+						}
+					}
 				}
 				e.sender.sendMsg(strReply);
 		   }
@@ -2313,6 +2380,161 @@ public:
 				   e.sender.sendMsg("我不知道你想告诉柴刀什么");
 			   }
 			}
+			else if (strLowerMessage[intMsgCnt] == 'w')
+		   {
+				intMsgCnt++;
+				bool boolShowDetail = false;
+				if (intMsgCnt != strLowerMessage.length() && strLowerMessage[intMsgCnt] == 'w')
+				{
+					boolShowDetail = true;
+					intMsgCnt++;
+				}
+				//取n#模块
+				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					intMsgCnt++;
+				int intMultDice = 1, intFindMultDiceCut = intMsgCnt;
+				string strMultDice;
+				while (intFindMultDiceCut != strLowerMessage.length()
+					&& isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]))
+					&& intFindMultDiceCut <= intMsgCnt + 3)
+				{
+					if (isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
+					{
+						strMultDice += strLowerMessage[intFindMultDiceCut];
+					}
+					intFindMultDiceCut++;
+				}
+				if (intFindMultDiceCut != strLowerMessage.length() && static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]) == '#')
+				{
+					if (strMultDice.length() == 0)
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数无效]);
+						return;
+					}
+					intMultDice = stoi(strMultDice);
+					if (intMultDice > 10)
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数过多]);
+						return;
+					}
+					intMsgCnt = intFindMultDiceCut;
+					intMsgCnt++;
+				}
+				//取n#模块
+
+				string strA, strB;
+				int intA = 0, intB = 10;
+				while (intMsgCnt != strLowerMessage.length() && isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				{
+					strA += strLowerMessage[intMsgCnt];
+					intMsgCnt++;
+				}
+				if (strA.empty())
+				{
+					e.sender.sendMsg(GlobalMsg[EnumErrorMsg.W指令格式错误]);
+					return;
+				}
+				if (strA.length() >= 4)
+				{
+					e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数过多]);
+					return;
+				}
+				intA = stoi(strA);
+				if (intA == 0)
+				{
+					e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数无效]);
+					return;
+				}
+				if (intMsgCnt != strLowerMessage.length() && strLowerMessage[intMsgCnt] == 'a')
+				{
+					intMsgCnt++;
+					while (intMsgCnt != strLowerMessage.length() && isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					{
+						strB += strLowerMessage[intMsgCnt];
+						intMsgCnt++;
+					}
+					if (strB.empty() || strB.length() > 2)
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.W指令格式错误]);
+						return;
+					}
+					intB = stoi(strB);
+					if (intB < 5 || intB > 10)
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.W指令格式错误]);
+						return;
+					}
+				}
+				/*补正数据读取开始*/
+				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					intMsgCnt++;
+				string strCorrection;
+				if (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*')
+				{
+					while (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*'
+						|| isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					{
+						strCorrection += strLowerMessage[intMsgCnt];
+						intMsgCnt++;
+					}
+				}
+				/*补正数据读取结束*/
+				string strReply;
+				if (intMsgCnt != strLowerMessage.length())
+				{
+					strReply = "为了" + msg.substr(intMsgCnt) + strNickName + "掷骰：";
+				}
+				else
+				{
+					strReply = strNickName + "骰出了：";
+				}
+				for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
+				{
+					string WResult = to_string(intA) + "a" + to_string(intB) + strCorrection + "=";
+					int intSuccess = intA, intResult = 0;
+					while (intSuccess != 0)
+					{
+						string TemResult = "{";
+						int intTemSuccess = 0;
+						for (int WCut = 1; WCut <= intSuccess; WCut++)
+						{
+							int intRD10 = RandomGenerator::Randint(1, 10);
+							if (intRD10 >= intB)
+							{
+								intTemSuccess++;
+								intResult++;
+							}
+							TemResult = TemResult + to_string(intRD10) + " ";
+						}
+						TemResult.pop_back();
+						TemResult += "}+";
+						if (boolShowDetail)
+						{
+							if (intSuccess > 10)
+							{
+								WResult += "{x" + to_string(intSuccess) + "}+";
+							}
+							else
+							{
+								WResult += TemResult;
+							}
+						}
+						intSuccess = intTemSuccess;
+					}
+					WResult.pop_back();
+					DiceCalculatorOutput Result = DiceCalculator(to_string(intResult) + strCorrection, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+					if (Result.complate)
+					{
+						WResult = WResult + "=" + to_string(Result.result);
+					}
+					else
+					{
+						e.sender.sendMsg(GlobalMsg[EnumErrorMsg.掷骰表达式错误]);
+					}
+					strReply = strReply + "\n" + WResult;
+				}
+				e.sender.sendMsg(strReply);
+			}
 			else if (strLowerMessage[intMsgCnt] == 'n')
 			{
 				intMsgCnt++;
@@ -2348,6 +2570,8 @@ public:
 			else if (strLowerMessage[intMsgCnt] == 'r')
 			{
 				intMsgCnt++;
+				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					intMsgCnt++;
 				bool isHiden = false, showDetail = false;
 				while (intMsgCnt != strLowerMessage.length()
 					&& (static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'h' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 's'))
@@ -2361,11 +2585,15 @@ public:
 						showDetail = true;
 					}
 					intMsgCnt++;
+					while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+						intMsgCnt++;
 				}
+				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					intMsgCnt++;
 				int intMultDice = 1, intFindMultDiceCut = intMsgCnt;
 				string strMultDice;
 				while (intFindMultDiceCut != strLowerMessage.length()
-					&& (static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]) != '#' || isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
+					&& isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]))
 					&& intFindMultDiceCut <= intMsgCnt + 3)
 				{
 					if (isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
@@ -2593,7 +2821,6 @@ public:
 			   e.sender.permission = 3;
 		   }
 		   string strLowerMessage = msg;
-		   logger->info("指令：" + msg + "\t处理开始");
 		   strLowerMessage = CDs_tolower(strLowerMessage);
 		   if (strLowerMessage.substr(intMsgCnt, 3) == "bot")
 		   {
@@ -2729,6 +2956,7 @@ public:
 		   }
 		   else if (strLowerMessage.substr(intMsgCnt, 4) == "jrrp")
 		   {
+			   IdleTimer(e.group.id());
 			   int intJrrpKey;
 			   SYSTEMTIME Time;
 			   GetLocalTime(&Time);
@@ -3332,8 +3560,19 @@ public:
 						   break;
 					   }
 					   /*加入-+*d的判定 向上*/
-					   if (!(stoi(strSkillVal) == SkillDefaultVal[strSkillName]))
+					   if (stoi(strSkillVal) == SkillDefaultVal[strSkillName])
+					   {
+						   if (MultCharProp.count(e.sender.id())
+							   && MultCharProp[e.sender.id()].count(strCharName)
+							   && MultCharProp[e.sender.id()][strCharName].count(strSkillName))
+						   {
+							   MultCharProp[e.sender.id()][strCharName].erase(strSkillName);
+						   }
+					   }
+					   else
+					   {
 						   MultCharProp[e.sender.id()][strCharName][strSkillName] = stoi(strSkillVal);
+					   }
 					   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
 				   }
 				   if (boolError)
@@ -3696,8 +3935,17 @@ public:
 					   break;
 				   }
 				   /*加入-+*d的判定 向上*/
-				   if (stoi(strSkillVal) != SkillDefaultVal[strSkillName])
+				   if (stoi(strSkillVal) == SkillDefaultVal[strSkillName])
+				   {
+					   if (CharacterProp.count(e.sender.id()) && CharacterProp[e.sender.id()].count(strSkillName))
+					   {
+						   CharacterProp[e.sender.id()].erase(strSkillName);
+					   }
+				   }
+				   else
+				   {
 					   CharacterProp[e.sender.id()][strSkillName] = stoi(strSkillVal);
+				   }
 				   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '|')intMsgCnt++;
 			   }
 			   if (boolError)
@@ -3721,6 +3969,7 @@ public:
 			}
 		   else if (strLowerMessage.substr(intMsgCnt, 2) == "ct")/*mark.ct的部分*/
 			{
+				IdleTimer(e.group.id());
 				intMsgCnt += 2;
 				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 					intMsgCnt++;
@@ -3771,6 +4020,7 @@ public:
 			}
 		   else if (strLowerMessage.substr(intMsgCnt, 2) == "so")/*浅草寺100签*/
 		   {
+			   IdleTimer(e.group.id());
 			   const int intsortilege = RandomGenerator::Randint(1, 100);
 			   string Sortilege = "（晃动签桶）......那么神明给" + strNickName + "的指引是.....\n" + "第" + std::to_string(intsortilege) + "签  " + SensojiTempleDivineSign[intsortilege];
 			   e.group.sendMsg(Sortilege);
@@ -3779,6 +4029,39 @@ public:
 		   {
 			   IdleTimer(e.group.id());
 			   intMsgCnt += 2;
+			   //取n#模块
+			   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				   intMsgCnt++;
+			   int intMultDice = 1, intFindMultDiceCut = intMsgCnt;
+			   string strMultDice;
+			   while (intFindMultDiceCut != strLowerMessage.length()
+				   && isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]))
+				   && intFindMultDiceCut <= intMsgCnt + 3)
+			   {
+				   if (isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
+				   {
+					   strMultDice += strLowerMessage[intFindMultDiceCut];
+				   }
+				   intFindMultDiceCut++;
+			   }
+			   if (intFindMultDiceCut != strLowerMessage.length() && static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]) == '#')
+			   {
+				   if (strMultDice.length() == 0)
+				   {
+					   e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数无效]);
+					   return;
+				   }
+				   intMultDice = stoi(strMultDice);
+				   if (intMultDice > 10)
+				   {
+					   e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数过多]);
+					   return;
+				   }
+				   intMsgCnt = intFindMultDiceCut;
+				   intMsgCnt++;
+			   }
+			   //取n#模块
+
 			   bool setporb = 0, isPunish = 1;/*下面是修改的部分mark(包括本行*/
 			   string strpbNum;
 			   int intpbNum = 1;
@@ -3818,36 +4101,20 @@ public:
 				   intMsgCnt++;
 			   }
 			   if (SkillNameReplace.count(strSkillName))strSkillName = SkillNameReplace[strSkillName];/*取得标准技能名称*/
-			   signed int intcorrection = 0;/*补正数据读取*/
-			   if (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-')
-			   {
-				   if (strLowerMessage[intMsgCnt] == '+')
-				   {
-					   intcorrection = 1;
-				   }
-				   else
-				   {
-					   intcorrection = -1;
-				   }
+			   /*补正数据读取开始*/
+			   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 				   intMsgCnt++;
-				   string strCorrection;
-				   while (isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+			   string strCorrection;
+			   if (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*')
+			   {
+				   while (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*'
+					   || isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 				   {
 					   strCorrection += strLowerMessage[intMsgCnt];
 					   intMsgCnt++;
 				   }
-				   if (strCorrection.empty())
-					   intcorrection = 0;
-				   else if (strCorrection.length() > 2)
-				   {
-					   e.group.sendMsg(GlobalMsg[EnumErrorMsg.技能值错误]);
-					   return;
-				   }
-				   else
-				   {
-					   intcorrection *= stoi(strCorrection);
-				   }
-			   }/*补正数据读取结束*/
+			   }
+			   /*补正数据读取结束*/
 			   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])) || strLowerMessage[intMsgCnt] == '=' || strLowerMessage[intMsgCnt] == ':')
 				   intMsgCnt++;
 			   string strSkillVal;
@@ -3901,146 +4168,157 @@ public:
 			   }
 			   else if (strSkillVal.length() > 3)
 			   {
-				   e.group.sendMsg(GlobalMsg[EnumErrorMsg.技能值错误]);
+				   e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰表达式错误]);
 				   return;
 			   }
 			   else
 			   {
 				   intSkillVal = stoi(strSkillVal);
 			   }
-			   if (intcorrection)/*数据补正*/
+			   if (!strCorrection.empty())/*数据补正录入*/
 			   {
-				   intSkillVal += intcorrection;
-			   }
-			   int intD100Res = RandomGenerator::Randint(1, 100);
-			   string strReply = strNickName + "进行" + strSkillName + "检定: D100=" + to_string(intD100Res);/*下面是修改的部分mark(包括本行*/
-			   if (setporb)
-			   {
-				   int pbRandom, single_figures;
-				   string pbShow = "";
-				   if (intD100Res == 100)
-					   single_figures = 0;
-				   else
-					   single_figures = intD100Res % 10;
-				   if (isPunish)
+				   DiceCalculatorOutput Result = DiceCalculator(to_string(intSkillVal) + strCorrection, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+				   if (Result.complate)
 				   {
-					   pbShow = "（惩罚骰：";
-					   for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
-					   {
-						   pbRandom = RandomGenerator::Randint(0, 9);
-						   pbShow = pbShow + " " + to_string(pbRandom);
-						   if ((pbRandom == 0) && (single_figures == 0))
-							   pbRandom = 10;
-						   pbRandom = pbRandom * 10;
-						   if (pbRandom > intD100Res)
-							   intD100Res = pbRandom + single_figures;
-					   }
+					   intSkillVal = Result.result;
 				   }
 				   else
 				   {
-					   pbShow = "（奖励骰：";
-					   for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
-					   {
-						   pbRandom = RandomGenerator::Randint(0, 9);
-						   pbShow = pbShow + " " + to_string(pbRandom);
-						   if ((pbRandom == 0) && (single_figures == 0))
-							   pbRandom = 10;
-						   pbRandom = pbRandom * 10;
-						   if (pbRandom < intD100Res)
-							   intD100Res = pbRandom + single_figures;
-					   }
+					   e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰表达式错误]);
 				   }
-				   pbShow = pbShow + "），最终结果是：" + to_string(intD100Res);
-				   strReply += pbShow + "/" + to_string(intSkillVal) + " ";
+				   
 			   }
-			   else
-				   strReply += "/" + to_string(intSkillVal) + " ";
-			   int RoomRuleNum = 5;/*自定义房规部分（包括此行向下*/
-			   if (RoomRule.count(e.group.id()))
-				   RoomRuleNum = RoomRule[e.group.id()];
-			   /*上面是修改的部分mark(包括本行*/
-
-			   if (RoomRuleNum == 101)//公式书规则检定
-			   {
-				   if (intD100Res == 1 && intD100Res <= intSkillVal)
-				   {
-					   strReply += GlobalMsg[EnumInfoMsg.大成功];
-				   }
-				   else if (intD100Res <= (intSkillVal / 5))
-				   {
-					   strReply += GlobalMsg[EnumInfoMsg.极难成功];
-				   }
-				   else if (intD100Res <= (intSkillVal / 2))
-				   {
-					   strReply += GlobalMsg[EnumInfoMsg.困难成功];
-				   }
-				   else if (intD100Res <= intSkillVal)
-				   {
-					   strReply += GlobalMsg[EnumInfoMsg.成功];
-				   }
-				   else
-				   {
-					   if (50 <= intSkillVal)/*技能大于50*/
-					   {
-						   if (intD100Res <= 99)
-						   {
-							   strReply += GlobalMsg[EnumInfoMsg.失败];
-						   }
-						   else
-						   {
-							   strReply += GlobalMsg[EnumInfoMsg.大失败];
-						   }
-					   }
-					   else
-					   {
-						   if (intD100Res <= 95)
-						   {
-							   strReply += GlobalMsg[EnumInfoMsg.失败];
-						   }
-						   else
-						   {
-							   strReply += GlobalMsg[EnumInfoMsg.大失败];
-						   }
-					   }
-				   }
-			   }
-			   else
-			   {
-				   if (intD100Res <= intSkillVal)/*成功*/
-				   {
-					   if (intD100Res <= RoomRuleNum)
-					   {
-						   strReply += GlobalMsg[EnumInfoMsg.大成功];
-					   }
-					   else if (intD100Res <= intSkillVal / 5)
-					   {
-						   strReply += GlobalMsg[EnumInfoMsg.极难成功];
-					   }
-					   else if (intD100Res <= intSkillVal / 2)
-					   {
-						   strReply += GlobalMsg[EnumInfoMsg.困难成功];
-					   }
-					   else
-					   {
-						   strReply += GlobalMsg[EnumInfoMsg.成功];
-					   }
-				   }
-				   else/*失败*/
-				   {
-					   if (intD100Res >= (101 - RoomRuleNum))
-					   {
-						   strReply += GlobalMsg[EnumInfoMsg.大失败];
-					   }
-					   else
-					   {
-						   strReply += GlobalMsg[EnumInfoMsg.失败];
-					   }
-				   }
-			   }
-
+			   string strReply = strNickName + "进行" + strSkillName + "检定:";
 			   if (!strReason.empty())
 			   {
 				   strReply = "由于" + strReason + " " + strReply;
+			   }
+			   for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
+			   {
+				   int intD100Res = RandomGenerator::Randint(1, 100);
+				   strReply = strReply + "\nD100 = " + to_string(intD100Res);/*下面是修改的部分mark(包括本行*/
+				   if (setporb)
+				   {
+					   int pbRandom, single_figures;
+					   string pbShow = "";
+					   if (intD100Res == 100)
+						   single_figures = 0;
+					   else
+						   single_figures = intD100Res % 10;
+					   if (isPunish)
+					   {
+						   pbShow = "（惩罚骰：";
+						   for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
+						   {
+							   pbRandom = RandomGenerator::Randint(0, 9);
+							   pbShow = pbShow + to_string(pbRandom) + " ";
+							   if ((pbRandom == 0) && (single_figures == 0))
+								   pbRandom = 10;
+							   pbRandom = pbRandom * 10;
+							   if (pbRandom > intD100Res)
+								   intD100Res = pbRandom + single_figures;
+						   }
+					   }
+					   else
+					   {
+						   pbShow = "（奖励骰：";
+						   for (int pbCunt = 0; pbCunt < intpbNum; pbCunt++)
+						   {
+							   pbRandom = RandomGenerator::Randint(0, 9);
+							   pbShow = pbShow + to_string(pbRandom) + " ";
+							   if ((pbRandom == 0) && (single_figures == 0))
+								   pbRandom = 10;
+							   pbRandom = pbRandom * 10;
+							   if (pbRandom < intD100Res)
+								   intD100Res = pbRandom + single_figures;
+						   }
+					   }
+					   pbShow.pop_back();
+					   pbShow = pbShow + "），最终结果是：" + to_string(intD100Res);
+					   strReply += pbShow + "/" + to_string(intSkillVal) + " ";
+				   }
+				   else
+					   strReply += "/" + to_string(intSkillVal) + " ";
+				   int RoomRuleNum = 5;/*自定义房规部分（包括此行向下*/
+				   /*上面是修改的部分mark(包括本行*/
+
+				   if (RoomRuleNum == 101)//公式书规则检定
+				   {
+					   if (intD100Res == 1 && intD100Res <= intSkillVal)
+					   {
+						   strReply += GlobalMsg[EnumInfoMsg.大成功];
+					   }
+					   else if (intD100Res <= (intSkillVal / 5))
+					   {
+						   strReply += GlobalMsg[EnumInfoMsg.极难成功];
+					   }
+					   else if (intD100Res <= (intSkillVal / 2))
+					   {
+						   strReply += GlobalMsg[EnumInfoMsg.困难成功];
+					   }
+					   else if (intD100Res <= intSkillVal)
+					   {
+						   strReply += GlobalMsg[EnumInfoMsg.成功];
+					   }
+					   else
+					   {
+						   if (50 <= intSkillVal)/*技能大于50*/
+						   {
+							   if (intD100Res <= 99)
+							   {
+								   strReply += GlobalMsg[EnumInfoMsg.失败];
+							   }
+							   else
+							   {
+								   strReply += GlobalMsg[EnumInfoMsg.大失败];
+							   }
+						   }
+						   else
+						   {
+							   if (intD100Res <= 95)
+							   {
+								   strReply += GlobalMsg[EnumInfoMsg.失败];
+							   }
+							   else
+							   {
+								   strReply += GlobalMsg[EnumInfoMsg.大失败];
+							   }
+						   }
+					   }
+				   }
+				   else
+				   {
+					   if (intD100Res <= intSkillVal)/*成功*/
+					   {
+						   if (intD100Res <= RoomRuleNum)
+						   {
+							   strReply += GlobalMsg[EnumInfoMsg.大成功];
+						   }
+						   else if (intD100Res <= intSkillVal / 5)
+						   {
+							   strReply += GlobalMsg[EnumInfoMsg.极难成功];
+						   }
+						   else if (intD100Res <= intSkillVal / 2)
+						   {
+							   strReply += GlobalMsg[EnumInfoMsg.困难成功];
+						   }
+						   else
+						   {
+							   strReply += GlobalMsg[EnumInfoMsg.成功];
+						   }
+					   }
+					   else/*失败*/
+					   {
+						   if (intD100Res >= (101 - RoomRuleNum))
+						   {
+							   strReply += GlobalMsg[EnumInfoMsg.大失败];
+						   }
+						   else
+						   {
+							   strReply += GlobalMsg[EnumInfoMsg.失败];
+						   }
+					   }
+				   }
 			   }
 			   e.group.sendMsg(strReply);
 		   }
@@ -4076,6 +4354,7 @@ public:
 		   }
 		   else if (strLowerMessage.substr(intMsgCnt, 4) == "name")
 			{
+				IdleTimer(e.group.id());
 				intMsgCnt += 4;
 				while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 					intMsgCnt++;
@@ -4938,6 +5217,7 @@ public:
 			}
 		   else if (strLowerMessage.substr(intMsgCnt, 8) == "tomaster")
 		   {
+			   IdleTimer(e.group.id());
 				 intMsgCnt += 8;
 				 while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 					 intMsgCnt++;
@@ -4951,8 +5231,164 @@ public:
 					 e.group.sendMsg("我不知道你想告诉柴刀什么");
 				 }
 			}
+		   else if (strLowerMessage[intMsgCnt] == 'w')
+		   {
+				 intMsgCnt++;
+				 bool boolShowDetail = false;
+				 if (intMsgCnt != strLowerMessage.length() && strLowerMessage[intMsgCnt] == 'w')
+				 {
+					 boolShowDetail = true;
+					 intMsgCnt++;
+				 }
+				 //取n#模块
+				 while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					 intMsgCnt++;
+				 int intMultDice = 1, intFindMultDiceCut = intMsgCnt;
+				 string strMultDice;
+				 while (intFindMultDiceCut != strLowerMessage.length()
+					 && isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]))
+					 && intFindMultDiceCut <= intMsgCnt + 3)
+				 {
+					 if (isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
+					 {
+						 strMultDice += strLowerMessage[intFindMultDiceCut];
+					 }
+					 intFindMultDiceCut++;
+				 }
+				 if (intFindMultDiceCut != strLowerMessage.length() && static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]) == '#')
+				 {
+					 if (strMultDice.length() == 0)
+					 {
+						 e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数无效]);
+						 return;
+					 }
+					 intMultDice = stoi(strMultDice);
+					 if (intMultDice > 10)
+					 {
+						 e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数过多]);
+						 return;
+					 }
+					 intMsgCnt = intFindMultDiceCut;
+					 intMsgCnt++;
+				 }
+				 //取n#模块
+
+				 string strA, strB;
+				 int intA = 0, intB = 10;
+				 while (intMsgCnt != strLowerMessage.length() && isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				 {
+					 strA += strLowerMessage[intMsgCnt];
+					 intMsgCnt++;
+				 }
+				 if (strA.empty())
+				 {
+					 e.group.sendMsg(GlobalMsg[EnumErrorMsg.W指令格式错误]);
+					 return;
+				 }
+				 if (strA.length() >= 4)
+				 {
+					 e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数过多]);
+					 return;
+				 }
+				 intA = stoi(strA);
+				 if (intA == 0)
+				 {
+					 e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰轮数无效]);
+					 return;
+				 }
+				 if (intMsgCnt != strLowerMessage.length() && strLowerMessage[intMsgCnt] == 'a')
+				 {
+					 intMsgCnt++;
+					 while (intMsgCnt != strLowerMessage.length() && isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					 {
+						 strB += strLowerMessage[intMsgCnt];
+						 intMsgCnt++;
+					 }
+					 if (strB.empty() || strB.length() > 2)
+					 {
+						 e.group.sendMsg(GlobalMsg[EnumErrorMsg.W指令格式错误]);
+						 return;
+					 }
+					 intB = stoi(strB);
+					 if (intB < 5 || intB > 10)
+					 {
+						 e.group.sendMsg(GlobalMsg[EnumErrorMsg.W指令格式错误]);
+						 return;
+					 }
+				 }
+				 /*补正数据读取开始*/
+				 while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					 intMsgCnt++;
+				 string strCorrection;
+				 if (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*')
+				 {
+					 while (strLowerMessage[intMsgCnt] == '+' || strLowerMessage[intMsgCnt] == '-' || strLowerMessage[intMsgCnt] == '*'
+						 || isdigit(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					 {
+						 strCorrection += strLowerMessage[intMsgCnt];
+						 intMsgCnt++;
+					 }
+				 }
+				 /*补正数据读取结束*/
+				 string strReply;
+				 if (intMsgCnt != strLowerMessage.length())
+				 {
+					 strReply = "为了" + msg.substr(intMsgCnt) + strNickName + "掷骰：";
+				 }
+				 else
+				 {
+					 strReply = strNickName + "骰出了：";
+				 }
+				 for (int MultDiceCut = 1; MultDiceCut <= intMultDice; MultDiceCut++)
+				 {
+					 string WResult = to_string(intA) + "a" + to_string(intB) + strCorrection + "=";
+					 int intSuccess = intA, intResult = 0;
+					 while (intSuccess != 0)
+					 {
+						 string TemResult = "{";
+						 int intTemSuccess = 0;
+						 for (int WCut = 1; WCut <= intSuccess; WCut++)
+						 {
+							 int intRD10 = RandomGenerator::Randint(1, 10);
+							 if (intRD10 >= intB)
+							 {
+								 intTemSuccess++;
+								 intResult++;
+							 }
+							 TemResult = TemResult + to_string(intRD10) + " ";
+						 }
+						 TemResult.pop_back();
+						 TemResult += "}+";
+						 if (boolShowDetail)
+						 {
+							 if (intSuccess > 10)
+							 {
+								 WResult += "{x" + to_string(intSuccess) + "}+";
+							 }
+							 else
+							 {
+								 WResult += TemResult;
+							 }
+						 }
+						 intSuccess = intTemSuccess;					 
+					 }
+					 WResult.pop_back();
+					 DiceCalculatorOutput Result = DiceCalculator(to_string(intResult) + strCorrection, DefaultDice.count(e.sender.id()) ? DefaultDice[e.sender.id()] : 100);
+					 if (Result.complate)
+					 {
+							 WResult = WResult + "=" + to_string(Result.result);							 
+					 }
+					 else
+					 {
+						 e.group.sendMsg(GlobalMsg[EnumErrorMsg.掷骰表达式错误]);
+					 }
+					 strReply = strReply + "\n" + WResult;
+				 }
+				 e.group.sendMsg(strReply);
+			}
 		   else if (strLowerMessage[intMsgCnt] == 'n')
 		   {
+		      IdleTimer(e.group.id());
 			  intMsgCnt++;
 			  while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
 				  intMsgCnt++;
@@ -5024,6 +5460,8 @@ public:
 		   {
 		       IdleTimer(e.group.id());
 			   intMsgCnt++;
+			   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				   intMsgCnt++;
 			   bool isHiden = false, showDetail = false;
 			   while (intMsgCnt != strLowerMessage.length()
 				   && (static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 'h' || static_cast<unsigned char>(strLowerMessage[intMsgCnt]) == 's'))
@@ -5037,11 +5475,15 @@ public:
 					   showDetail = true;
 				   }
 				   intMsgCnt++;
+				   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+					   intMsgCnt++;
 			   }
+			   while (isspace(static_cast<unsigned char>(strLowerMessage[intMsgCnt])))
+				   intMsgCnt++;
 			   int intMultDice = 1, intFindMultDiceCut = intMsgCnt;
 			   string strMultDice;
 			   while (intFindMultDiceCut != strLowerMessage.length()
-				   && (static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]) != '#' || isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
+				   && isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut]))
 				   && intFindMultDiceCut <= intMsgCnt + 3)
 			   {
 				   if (isdigit(static_cast<unsigned char>(strLowerMessage[intFindMultDiceCut])))
@@ -5147,7 +5589,6 @@ public:
 		   {
 			   return;
 		   }
-		   logger->info("指令：" + msg + "\t处理完成");
 		   return;
         });
         // 监听群临时会话
@@ -5266,6 +5707,13 @@ public:
 		}
 		ofstreamRoomRule.close();
 		logger->info("村规存储完成");
+		ofstream ofstreamDefaultDice(strFileLoc + "DefaultDice.RDconf", ios::out | ios::trunc);
+		for (auto it = DefaultDice.begin(); it != DefaultDice.end(); ++it)
+		{
+			ofstreamDefaultDice << it->first << " " << it->second << std::endl;
+		}
+		ofstreamDefaultDice.close();
+		logger->info("默认骰存储完成");
         /*插件结束*/
     }
 };
